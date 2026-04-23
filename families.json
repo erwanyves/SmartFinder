@@ -1,0 +1,12 @@
+[
+  {
+    "name": "ORing",
+    "property": "uuid_joint",
+    "macro": "C:/Users/yvesg/AppData/Roaming/FreeCAD/Macro/ORing.py"
+  },
+  {
+    "name": "Spring",
+    "property": "activeTurnsHight",
+    "macro": "C:/Users/yvesg/AppData/Roaming/FreeCAD/Macro/SpringFull.FCMacro"
+  }
+]
