@@ -191,7 +191,7 @@ SmartFinder was designed to work with the following companion macros, also avail
 
 - **SpringFull.FCMacro** — parametric spring designer
 - **Oring.py** — O-ring groove manager (ISO 3601, DIN 3771, JIS B2401)
-- **Profile.FCMacro** — structural profile library
+
 
 ---
 
