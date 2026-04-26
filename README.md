@@ -2,7 +2,7 @@
 
 > A unified launcher for FreeCAD component macros — one toolbar icon to rule them all.
 
-SmartFinder is a FreeCAD macro that acts as an intelligent dispatcher for your component-specific macros (Springs, O-rings, Profiles, and any future additions). Instead of cluttering your toolbar with one icon per macro, SmartFinder provides a single entry point that auto-detects the selected component's family and launches the right macro automatically.
+SmartFinder is a FreeCAD macro that acts as an intelligent dispatcher for your component-specific macros (Springs, O-rings, and any future additions). Instead of cluttering your toolbar with one icon per macro, SmartFinder provides a single entry point that auto-detects the selected component's family and launches the right macro automatically.
 
 ---
 
