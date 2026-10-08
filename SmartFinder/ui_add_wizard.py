@@ -8,8 +8,12 @@ from __future__ import annotations
 import os
 
 import FreeCAD
-from PySide2 import QtWidgets
+try:
+    from PySide6 import QtWidgets
+except ImportError:
+    from PySide2 import QtWidgets
 from i18n import tr
+from detector import DM_BODY_PART, DM_ARC_CIRCLE, DM_LCS
 
 
 class AddFamilyWizard(QtWidgets.QDialog):
@@ -87,6 +91,24 @@ class AddFamilyWizard(QtWidgets.QDialog):
         lay_macro.addWidget(btn_browse)
         root.addWidget(grp_macro)
 
+        # ── ④ Modes de détection (positionnement pour une création) ───────────
+        grp_modes = QtWidgets.QGroupBox(tr("wizard.grp_modes"))
+        lay_modes = QtWidgets.QVBoxLayout(grp_modes)
+
+        self._chk_body_part  = QtWidgets.QCheckBox(tr("wizard.mode_body_part"))
+        self._chk_arc_circle = QtWidgets.QCheckBox(tr("wizard.mode_arc_circle"))
+        self._chk_lcs        = QtWidgets.QCheckBox(tr("wizard.mode_lcs"))
+        lay_modes.addWidget(self._chk_body_part)
+        lay_modes.addWidget(self._chk_arc_circle)
+        lay_modes.addWidget(self._chk_lcs)
+
+        hint = QtWidgets.QLabel(tr("wizard.modes_hint"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: gray; font-style: italic;")
+        lay_modes.addWidget(hint)
+
+        root.addWidget(grp_modes)
+
         # ── Boutons de validation ─────────────────────────────────────────────
         sep = QtWidgets.QFrame()
         sep.setFrameShape(QtWidgets.QFrame.HLine)
@@ -137,6 +159,12 @@ class AddFamilyWizard(QtWidgets.QDialog):
         self._edit_name.setText(existing.get("name", ""))
         self._edit_macro.setText(existing.get("macro", ""))
         self._edit_prop_manual.setText(existing.get("property", ""))
+
+        modes = existing.get("detection_modes") or []
+        self._chk_body_part.setChecked(DM_BODY_PART in modes)
+        self._chk_arc_circle.setChecked(DM_ARC_CIRCLE in modes)
+        self._chk_lcs.setChecked(DM_LCS in modes)
+
         self._refresh_properties()
 
     def _browse_macro(self) -> None:
@@ -156,6 +184,16 @@ class AddFamilyWizard(QtWidgets.QDialog):
             return manual
         data = self._combo_prop.currentData()
         return data if data else ""
+
+    def _resolve_detection_modes(self) -> list:
+        modes = []
+        if self._chk_body_part.isChecked():
+            modes.append(DM_BODY_PART)
+        if self._chk_arc_circle.isChecked():
+            modes.append(DM_ARC_CIRCLE)
+        if self._chk_lcs.isChecked():
+            modes.append(DM_LCS)
+        return modes
 
     def _on_ok(self) -> None:
         name       = self._edit_name.text().strip()
@@ -178,7 +216,12 @@ class AddFamilyWizard(QtWidgets.QDialog):
             )
             return
 
-        self._result = {"name": name, "prop": prop, "macro_path": macro_path}
+        self._result = {
+            "name": name,
+            "prop": prop,
+            "macro_path": macro_path,
+            "detection_modes": self._resolve_detection_modes(),
+        }
         self.accept()
 
     def get_result(self):

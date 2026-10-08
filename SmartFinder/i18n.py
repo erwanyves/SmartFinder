@@ -68,12 +68,16 @@ def _has_catalog(code: str) -> bool:
 
 def _detect_lang() -> str:
 
-    # 1. lang.txt
+    # 1. lang.txt (les lignes de commentaire '#' sont ignorées)
     try:
         with open(_LANG_FILE, "r", encoding="utf-8") as fh:
-            code = fh.read().strip().split()[0].lower()
-        if code and _has_catalog(code):
-            return code
+            for line in fh:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    code = line.split()[0].lower()
+                    if code and _has_catalog(code):
+                        return code
+                    break
     except (FileNotFoundError, IndexError, OSError):
         pass
 

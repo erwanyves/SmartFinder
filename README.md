@@ -2,7 +2,9 @@
 
 > A unified launcher for FreeCAD component macros — one toolbar icon to rule them all.
 
-SmartFinder is a FreeCAD macro that acts as an intelligent dispatcher for your component-specific macros (Springs, O-rings, and any future additions). Instead of cluttering your toolbar with one icon per macro, SmartFinder provides a single entry point that auto-detects the selected component's family and launches the right macro automatically.
+**Author:** Yves Guillou · **Version:** 2.0 · **License:** LGPL v2.1
+
+SmartFinder is a FreeCAD macro that acts as an intelligent dispatcher for your component-specific macros (springs, O-rings, standard parts, swagings, and any future additions). Instead of cluttering your toolbar with one icon per macro, SmartFinder provides a single entry point that auto-detects the selected component's family and launches the right macro automatically.
 
 ---
 
@@ -14,8 +16,9 @@ SmartFinder is a FreeCAD macro that acts as an intelligent dispatcher for your c
 - **Family editor** — a built-in CRUD dialog lets you add, edit, and delete component families at any time, without touching any file manually.
 - **Add-family wizard** — step-by-step assistant that reads the custom properties of the currently selected FreeCAD object so you can pick the identifying property directly from a list.
 - **Persistent storage** — family definitions are saved in `families.json` and survive FreeCAD restarts.
-- **Internationalisation** — UI fully translated in English and French. Language is auto-detected from FreeCAD preferences, then system locale. A `lang.txt` file lets you override the language manually.
+- **Internationalisation** — UI translated into English, French, German, Spanish and Italian. Language is auto-detected from FreeCAD preferences, then system locale. A `lang.txt` file lets you override the language manually.
 - **Extensible** — adding a new language requires only a new `locales/<code>.json` file. Adding a new component family takes three clicks in the editor.
+- **Selection-type routing** — when no existing component is recognised, SmartFinder can also filter families by the raw type of the current selection (a Body/Part, an arc/circle, an LCS or one of its axis branches), based on `detection_modes` declared per family. See *How Selection-Type Detection Works* below.
 - **Modular architecture** — cleanly separated into functional modules (controller, detector, launcher, families, UI, i18n) for easy maintenance and testing.
 
 ---
@@ -26,7 +29,7 @@ SmartFinder is a FreeCAD macro that acts as an intelligent dispatcher for your c
 |---|---|
 | FreeCAD | ≥ 1.0 |
 | Python | ≥ 3.8 (bundled with FreeCAD) |
-| PySide2 | bundled with FreeCAD |
+| PySide2 or PySide6 | bundled with FreeCAD |
 
 No external dependencies.
 
@@ -42,8 +45,8 @@ Typical paths:
 
 | OS | Path |
 |---|---|
-| Linux | `~/.FreeCAD/Macro/` |
-| macOS | `~/Library/Preferences/FreeCAD/Macro/` |
+| Linux | `~/.local/share/FreeCAD/Macro/` |
+| macOS | `~/Library/Application Support/FreeCAD/Macro/` |
 | Windows | `%APPDATA%\FreeCAD\Macro\` |
 
 ### 2. Copy the files
@@ -54,10 +57,9 @@ Place `SmartFinder.FCMacro` and the `SmartFinder/` folder into your macro direct
 <Macro directory>/
 ├── SmartFinder.FCMacro          ← entry point (the file you run)
 └── SmartFinder/
-    ├── __init__.py
     ├── controller.py
     ├── detector.py
-    ├── families.json             ← auto-created on first run
+    ├── families.json             ← created on first run (not in the repository)
     ├── families.py
     ├── i18n.py
     ├── lang.txt                  ← optional language override
@@ -66,8 +68,7 @@ Place `SmartFinder.FCMacro` and the `SmartFinder/` folder into your macro direct
     ├── ui_editor.py
     ├── ui_main.py
     └── locales/
-        ├── en.json
-        └── fr.json
+        └── en.json · fr.json · de.json · es.json · it.json
 ```
 
 ### 3. Add a toolbar button (recommended)
@@ -97,14 +98,15 @@ On first run, `families.json` is empty. SmartFinder will prompt you to add a fam
 6. **Step ③** — Click **Browse…** and select the `.FCMacro` file associated with this family.
 7. Click **OK** — the family is saved.
 
-Repeat for each component type (Oring, Profile, etc.).
+Repeat for each component type. The values for the companion macros are listed under [Related Macros](#related-macros).
 
 ### Everyday use
 
 | Situation | What happens |
 |---|---|
 | Select a recognised component → launch SmartFinder | The associated macro starts immediately |
-| Select nothing (or an unrecognised object) → launch SmartFinder | A dropdown appears — pick a family and click **Launch** |
+| Select nothing → launch SmartFinder | SmartFinder's main entry point: a dropdown lists every registered family — pick one and click **Launch**. A checkbox lets you also browse unregistered `.py`/`.FCMacro` files in your macro folder. This replaces going through FreeCAD's *Macro → Macros…* menu for these macros. |
+| Select a Body/Part, an arc/circle, or an LCS that isn't a recognised component → launch SmartFinder | SmartFinder filters registered families to those that declare accepting this selection type (`detection_modes`) — direct launch if only one matches, a restricted dropdown otherwise, or the full list if none do |
 | Two or more families match the selected object | An orange ⚠ banner explains the ambiguity — choose the correct family or open the editor to fix identifying properties |
 
 ---
@@ -142,7 +144,10 @@ SmartFinder/
 ├── ui_main.py         Main dialog — dropdown + launch / edit buttons
 └── locales/
     ├── en.json        English strings (reference)
-    └── fr.json        French strings
+    ├── fr.json        French strings
+    ├── de.json        German strings
+    ├── es.json        Spanish strings
+    └── it.json        Italian strings
 ```
 
 ---
@@ -160,6 +165,15 @@ Each family is identified by a **single custom FreeCAD property name**. When Sma
 To avoid false positives, choose an identifying property that is **unique to that component type** — a property that your macro adds only to that specific kind of object (e.g. `SpringRate` rather than a generic `Diameter`).
 
 ---
+
+## How Selection-Type Detection Works
+
+Independent of the family-recognition mechanism above (which only recognises *existing* components), SmartFinder can also route based on the **raw geometric type** of the current selection — used to decide which macro(s) can *create* a new instance positioned on that selection:
+
+1. If an existing recognised component is found, it always takes priority (direct launch / ambiguity dialog as described above) — selection-type routing only kicks in when nothing existing is recognised.
+2. Otherwise, the raw selection is classified as one of: a `PartDesign::Body` / `App::Part` selected directly, a circular arc/edge or cylindrical/conical face clicked in the 3D view, an LCS (or a precise X/Y/Z axis branch of one), or an unclassified surface/geometry element.
+3. Registered families that declare the matching `detection_modes` value (`body_part`, `arc_circle`, `lcs`) are proposed: a single match launches directly, several open a restricted dropdown, and none falls back to the full family list.
+4. `detection_modes` is set per family in the **Add/Edit family** wizard (step ④), independently of the identifying property used for recognising existing components (step ②) — a macro can accept several selection types at once.
 
 ## Extending SmartFinder
 
@@ -187,11 +201,14 @@ Each module has a single, well-defined responsibility. The recommended entry poi
 
 ## Related Macros
 
-SmartFinder was designed to work with the following companion macros, also available in this repository:
+SmartFinder was designed to work with the following macros, each in its own repository. To register one, use these values in the wizard:
 
-- **SpringFull.FCMacro** — parametric spring designer
-- **Oring.py** — O-ring groove manager (ISO 3601, DIN 3771, JIS B2401)
-
+| Macro | Repository | Macro file | Identifying property | Detection modes |
+|---|---|---|---|---|
+| ORing — O-ring grooves | [erwanyves/ORing](https://github.com/erwanyves/ORing) | `ORing.py` | `uuid_joint` | `body_part` |
+| SpringFull — compression springs | [erwanyves/SpringFull](https://github.com/erwanyves/SpringFull) | `SpringFull.FCMacro` | `activeTurnsHight` | `body_part`, `arc_circle`, `lcs` |
+| StandardPartSelector — standard parts | [erwanyves/StandardPartSelector](https://github.com/erwanyves/StandardPartSelector) | `StandardPartSelector.py` | `SC_Standard` | `body_part`, `arc_circle`, `lcs` |
+| Swaging — swagings | [erwanyves/Swaging](https://github.com/erwanyves/Swaging) | `Swaging.FCMacro` | `SWG_Corps` | `arc_circle` |
 
 ---
 
@@ -210,4 +227,4 @@ Please keep each module's single-responsibility principle intact, and add or upd
 
 ## License
 
-This project is licensed under the **LGPL License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **GNU Lesser General Public License v2.1** — see the [LICENSE](LICENSE) file for details.

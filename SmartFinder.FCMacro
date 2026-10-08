@@ -1,0 +1,65 @@
+# -*- coding: utf-8 -*-
+# Auteur  : Yves Guillou
+# Licence : LGPL-2.1 — voir le fichier LICENSE du dépôt
+# SmartFinder.FCMacro — Point d'entrée unique
+# Placer dans le répertoire Macros de FreeCAD.
+# Le dossier SmartFinder/ doit se trouver dans le même répertoire.
+#
+# Usage :
+#   - Sans sélection   → dialogue de choix du type de composant
+#   - Avec sélection   → détection automatique + lancement de la macro associée
+
+__version__ = "2.0"
+
+import sys
+import os
+import importlib
+
+import FreeCAD
+
+# ── Résolution du chemin du dossier SmartFinder ──────────────────────────────
+MACRO_DIR = FreeCAD.getUserMacroDir(True)
+SF_DIR    = os.path.join(MACRO_DIR, "SmartFinder")
+
+if not os.path.isdir(SF_DIR):
+    FreeCAD.Console.PrintError(
+        f"SmartFinder : dossier introuvable → {SF_DIR}\n"
+        "Vérifiez que le dossier SmartFinder/ est bien placé dans votre "
+        "répertoire Macros.\n"
+    )
+else:
+    # Toujours replacer SF_DIR en tête de sys.path (pas seulement l'y ajouter
+    # s'il est absent) : d'autres macros du même dossier Macro (ORing,
+    # SpringFull, StandardPartSelector...) ont chacune leur propre module
+    # local nommé de façon générique (i18n, config, geometry...) et font la
+    # même manœuvre sur sys.path. Si SF_DIR reste coincé derrière le dossier
+    # d'une autre macro déjà lancée dans cette session FreeCAD, un simple
+    # `import i18n` ici peut charger PAR ERREUR le i18n.py de cette autre
+    # macro (même nom de fichier, contenu différent) — d'où des libellés
+    # d'interface affichés en clé brute (« main.title » au lieu de
+    # « Smart Finder »). Remettre SF_DIR en tête à chaque lancement évite ça.
+    if SF_DIR in sys.path:
+        sys.path.remove(SF_DIR)
+    sys.path.insert(0, SF_DIR)
+
+    try:
+        # Purge (et non simple reload) des modules de SmartFinder avant
+        # réimport : un reload() réexécute le fichier déjà associé au nom de
+        # module en cache, ce qui ne corrige RIEN si ce nom a été capturé par
+        # le fichier d'une autre macro (voir remarque ci-dessus) — seule une
+        # suppression du cache force une résolution fraîche via sys.path,
+        # qui pointera désormais correctement vers SF_DIR (juste replacé en
+        # tête ci-dessus). Même principe que StandardPartSelector.py.
+        _modules = ["i18n", "families", "detector", "launcher",
+                    "ui_main", "ui_editor", "ui_add_wizard", "controller"]
+        for _mod_name in _modules:
+            sys.modules.pop(_mod_name, None)
+
+        import controller as _ctrl_mod
+        _ctrl_mod.SmartFinderController().run()
+
+    except Exception:
+        import traceback
+        FreeCAD.Console.PrintError(
+            f"SmartFinder : erreur au démarrage :\n{traceback.format_exc()}\n"
+        )

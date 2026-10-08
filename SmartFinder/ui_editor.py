@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import os
 
-from PySide2 import QtWidgets
+try:
+    from PySide6 import QtWidgets
+except ImportError:
+    from PySide2 import QtWidgets
 from i18n import tr
 
 
@@ -21,7 +24,7 @@ class EditorDialog(QtWidgets.QDialog):
 
     def _setup_ui(self) -> None:
         self.setWindowTitle(tr("editor.title"))
-        self.setMinimumSize(600, 380)
+        self.setMinimumSize(680, 380)
 
         root = QtWidgets.QVBoxLayout(self)
         root.setSpacing(10)
@@ -32,10 +35,11 @@ class EditorDialog(QtWidgets.QDialog):
         root.addWidget(lbl)
 
         self._tree = QtWidgets.QTreeWidget()
-        self._tree.setColumnCount(3)
+        self._tree.setColumnCount(4)
         self._tree.setHeaderLabels([
             tr("editor.col_family"),
             tr("editor.col_property"),
+            tr("editor.col_modes"),
             tr("editor.col_macro"),
         ])
         self._tree.setRootIsDecorated(False)
@@ -44,6 +48,7 @@ class EditorDialog(QtWidgets.QDialog):
         self._tree.header().setStretchLastSection(True)
         self._tree.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
         self._tree.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self._tree.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
         self._tree.doubleClicked.connect(self._on_edit)
         root.addWidget(self._tree)
 
@@ -71,12 +76,14 @@ class EditorDialog(QtWidgets.QDialog):
         self._tree.clear()
         for f in self._families:
             macro_short = os.path.basename(f.get("macro", ""))
+            modes_str   = ", ".join(f.get("detection_modes") or []) or "—"
             item = QtWidgets.QTreeWidgetItem([
                 f.get("name", ""),
                 f.get("property", ""),
+                modes_str,
                 macro_short,
             ])
-            item.setToolTip(2, f.get("macro", ""))
+            item.setToolTip(3, f.get("macro", ""))
             self._tree.addTopLevelItem(item)
 
     def _current_index(self):
@@ -93,9 +100,10 @@ class EditorDialog(QtWidgets.QDialog):
             if result:
                 fam_mod.add_family(
                     self._families,
-                    name       = result["name"],
-                    prop       = result["prop"],
-                    macro_path = result["macro_path"],
+                    name            = result["name"],
+                    prop            = result["prop"],
+                    macro_path      = result["macro_path"],
+                    detection_modes = result.get("detection_modes"),
                 )
                 self._refresh_list()
 
@@ -118,9 +126,10 @@ class EditorDialog(QtWidgets.QDialog):
             if result:
                 fam_mod.update_family(
                     self._families, idx,
-                    name       = result["name"],
-                    prop       = result["prop"],
-                    macro_path = result["macro_path"],
+                    name            = result["name"],
+                    prop            = result["prop"],
+                    macro_path      = result["macro_path"],
+                    detection_modes = result.get("detection_modes"),
                 )
                 self._refresh_list()
 

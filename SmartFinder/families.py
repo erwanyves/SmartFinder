@@ -4,9 +4,15 @@ families.py — Couche d'accès aux données des familles de composants.
 
 Chaque famille est un dict :
     {
-        "name"     : str   — nom affiché (ex. "Oring")
-        "property" : str   — nom de la propriété FreeCAD identifiant la famille
-        "macro"    : str   — chemin absolu vers la .FCMacro associée
+        "name"            : str        — nom affiché (ex. "Oring")
+        "property"        : str        — nom de la propriété FreeCAD identifiant la famille
+        "macro"           : str        — chemin absolu vers la .FCMacro associée
+        "detection_modes" : list[str]  — types de sélection bruts acceptés pour une
+                                          CRÉATION (indépendant de la reconnaissance par
+                                          propriété identifiante ci-dessus, voir detector.py) :
+                                          "body_part", "arc_circle", "lcs". Optionnel,
+                                          [] par défaut (rétro-compatible avec les
+                                          entrées existantes qui n'ont pas ce champ).
     }
 
 Les données sont persistées dans families.json, dans le même dossier que ce module.
@@ -58,18 +64,39 @@ def save_families(families: list) -> None:
 #  CRUD
 # ─────────────────────────────────────────────────────────────────────────────
 
-def add_family(families: list, name: str, prop: str, macro_path: str) -> None:
+def add_family(
+    families: list,
+    name: str,
+    prop: str,
+    macro_path: str,
+    detection_modes: list | None = None,
+) -> None:
     """Ajoute une nouvelle famille et sauvegarde."""
-    families.append({"name": name, "property": prop, "macro": macro_path})
+    families.append({
+        "name": name,
+        "property": prop,
+        "macro": macro_path,
+        "detection_modes": list(detection_modes or []),
+    })
     save_families(families)
 
 
 def update_family(
-    families: list, index: int, name: str, prop: str, macro_path: str
+    families: list,
+    index: int,
+    name: str,
+    prop: str,
+    macro_path: str,
+    detection_modes: list | None = None,
 ) -> None:
     """Met à jour la famille à l'index donné et sauvegarde."""
     if 0 <= index < len(families):
-        families[index] = {"name": name, "property": prop, "macro": macro_path}
+        families[index] = {
+            "name": name,
+            "property": prop,
+            "macro": macro_path,
+            "detection_modes": list(detection_modes or []),
+        }
         save_families(families)
 
 
@@ -87,6 +114,56 @@ def find_by_name(families: list, name: str) -> dict | None:
         if f.get("name", "").lower() == name_lower:
             return f
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Macros non enregistrées (option affichée uniquement quand rien n'est
+#  sélectionné à l'appel de SmartFinder — voir controller.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def list_unregistered_macros(families: list) -> list:
+    """Retourne les fichiers .py / .FCMacro à la racine du dossier macro
+    FreeCAD qui ne sont pas déjà associés à une famille enregistrée (ni
+    SmartFinder.FCMacro lui-même). Ne descend pas dans les sous-dossiers
+    (modules internes des macros métier).
+
+    Returns:
+        Liste de dicts {"name": str, "macro": str}, triée par nom.
+    """
+    try:
+        import FreeCAD
+        macro_dir = FreeCAD.getUserMacroDir(True)
+    except Exception:
+        return []
+
+    if not macro_dir or not os.path.isdir(macro_dir):
+        return []
+
+    def _norm(path: str) -> str:
+        return os.path.normcase(os.path.abspath(path))
+
+    registered = {_norm(f["macro"]) for f in families if f.get("macro")}
+    self_path  = _norm(os.path.join(macro_dir, "SmartFinder.FCMacro"))
+
+    try:
+        entries = os.listdir(macro_dir)
+    except OSError:
+        return []
+
+    results = []
+    for entry in entries:
+        if not entry.lower().endswith((".py", ".fcmacro")):
+            continue
+        full = os.path.join(macro_dir, entry)
+        if not os.path.isfile(full):
+            continue
+        norm = _norm(full)
+        if norm in registered or norm == self_path:
+            continue
+        results.append({"name": entry, "macro": full})
+
+    results.sort(key=lambda d: d["name"].lower())
+    return results
 
 
 # ─────────────────────────────────────────────────────────────────────────────
